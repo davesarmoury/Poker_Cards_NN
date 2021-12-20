@@ -9,3 +9,6 @@ rm roboflow.zip
 cd yolov5
 pip3 install -r requirements.txt
 
+cd ..
+
+python3 preprocess.py
