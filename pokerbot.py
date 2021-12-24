@@ -108,23 +108,35 @@ def new_deal():
 @app.route("/turn")
 def new_turn():
     global current_bet, new_turn
-    current_bet = int(request.args.get("current_bet"))
+    current_bet = int(request.args.get("current_bet"), 0)
     new_turn = True
     return "Confirmed"
 
+@app.route("/lose")
+def new_turn():
+    playAudio(audio, "lose")
+    return "Confirmed"
+
+@app.route("/win")
+def new_turn():
+    playAudio(audio, "lose")
+    return "Confirmed"
+
 def bet(robot):
+    playAudio(audio, "bet")
     pass
 
-def draw(robot):
+def fold(robot):
+    playAudio(audio, "fold")
     pass
 
 def show(robot):
     pass
 
-def fold(robot):
+def river(robot):
     pass
 
-def river(robot):
+def draw(robot):
     pass
 
 def getFrame():
