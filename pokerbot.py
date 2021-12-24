@@ -49,7 +49,7 @@ audio["lose"].append("turretshotbylaser10.wav")
 audio["lose"].append("turretwitnessdeath02.wav")
 audio["lose"].append("turretwitnessdeath10.wav")
 
-def playAudio(audio, type, dir, odds=70):
+def playAudio(audio, type, dir="portal_turret_audio/audio/", odds=70):
     randval = random.randint(0, 100)
     if odds >= randval:
         pygame.mixer.music.load(dir + audio[type][random.randint(0, len(audio[type]) - 1)])
@@ -126,11 +126,12 @@ def getFrame():
     return rframe
 
 def main():
-    global keep_camming, lock, new_frame
+    global keep_camming, lock, new_frame, audio
 
     robot = initRobot(robot_ip)
 
     if robot:
+        pygame.mixer.init()
         openGripper(robot)
         closeGripper(robot)
 
@@ -141,6 +142,8 @@ def main():
         cam_thread.daemon = True
         cam_thread.start()
 
+        playAudio(audio, "startup", odds=100)
+
         while True:
             if new_frame:
                 img = getFrame()
@@ -150,6 +153,7 @@ def main():
             time.sleep(0.01)
 
         keep_camming = False
+        pygame.mixer.quit()
         cv2.destroyAllWindows()
         robot.close_connection()
         time.sleep(1.0)
