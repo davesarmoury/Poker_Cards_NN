@@ -6,6 +6,14 @@ from threading import Thread, Lock
 import pygame
 import time
 import random
+
+import torch
+import torch.backends.cudnn as cudnn
+
+from models.experimental import attempt_load
+from utils.general import check_img_size, non_max_suppression
+from utils.torch_utils import select_device, time_synchronized
+
 from yaml import load, dump
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
@@ -50,6 +58,58 @@ def initRobot(ip):
     except Exception as e:
         print("INIT ERROR: " + str(e))
         return None
+
+def yoloThread():
+    global shut_r_down, image_lock, new_frame, _frame
+
+    device = select_device("")
+    half = device.type != 'cpu'
+    cudnn.benchmark = True
+
+    model = attempt_load("best.pt", map_location=device)
+    stride = int(model.stride.max())
+    imgsz = check_img_size(imgsz, s=stride)
+    if half:
+        model.half()  # to FP16
+
+    names = model.module.names if hasattr(model, 'module') else model.names
+    colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
+
+    if device.type != 'cpu':
+        model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
+
+    while not shut_r_down:
+        if new_frame:
+            image_lock.acquire()
+            frame = _frame
+            new_frame = False
+            image_lock.release()
+
+            ###################
+            img = torch.from_numpy(frame).to(device)
+            img = img.half() if half else img.float()  # uint8 to fp16/32
+            img /= 255.0  # 0 - 255 to 0.0 - 1.0
+            if img.ndimension() == 3:
+                img = img.unsqueeze(0)
+
+            # Inference
+            t1 = time_synchronized()
+            pred = model(img, augment=opt.augment)[0]
+
+            pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
+            t2 = time_synchronized()
+
+            s = ""
+            for i, det in enumerate(pred):  # detections per image
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()  # detections per class
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+
+                    print(f'{s}Done. ({t2 - t1:.3f}s)')
+
+        time.sleep(0.002)
+
+    print("Network Thread Closed")
 
 def cameraThread():
     global shut_r_down, image_lock, new_frame, _frame
@@ -207,6 +267,10 @@ def main():
         cam_thread = Thread(target=cameraThread, args=())
         cam_thread.daemon = True
         cam_thread.start()
+
+        yolo_thread = Thread(target=yoloThread, args=())
+        yolo_thread.daemon = True
+        yolo_thread.start()
 
         arm_thread = Thread(target=armThread, args=())
         arm_thread.daemon = True
