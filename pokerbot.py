@@ -61,7 +61,7 @@ def initRobot(ip):
         return None
 
 def yoloThread():
-    global shut_r_down, image_lock, new_frame, _frame
+    global shut_r_down, image_lock, new_frame, _frame, detection_lock, new_detection, _detection
 
     device = select_device("")
     half = device.type != 'cpu'
@@ -78,6 +78,8 @@ def yoloThread():
 
     if device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
+
+    print("Yolo init complete")
 
     while not shut_r_down:
         if new_frame:
@@ -103,12 +105,19 @@ def yoloThread():
             t2 = time_synchronized()
 
             s = ""
+            detection = []
             for i, det in enumerate(pred):  # detections per image
                 for c in det[:, -1].unique():
                     n = (det[:, -1] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                    detection.append(names[int(c)])
 
                     print(f'{s}Done. ({t2 - t1:.3f}s)')
+
+            detection_lock.acquire()
+            _detection = detection
+            new_detection = True
+            detection_lock.release()
 
         time.sleep(0.002)
 
@@ -249,7 +258,7 @@ def getFrame():
     return rframe
 
 def main():
-    global shut_r_down, image_lock, new_turn, new_hand, new_river, robot
+    global shut_r_down, image_lock, new_turn, new_hand, new_river, robot, detection_lock
 
     current_bet = 0
     new_turn = False
@@ -274,6 +283,7 @@ def main():
         cam_thread.daemon = True
         cam_thread.start()
 
+        detection_lock = Lock()
         yolo_thread = Thread(target=yoloThread, args=())
         yolo_thread.daemon = True
         yolo_thread.start()
