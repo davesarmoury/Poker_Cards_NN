@@ -79,19 +79,29 @@ def cameraThread():
     print("Video Stream Closed")
 
 def armThread():
-    global shut_r_down, robot, current_bet, new_turn, new_deal
+    global shut_r_down, robot, current_bet, new_hand, new_river
 
     while not shut_r_down:
-        if new_deal:
-            print("New Deal")
-            new_deal = False
+        if new_hand:
+            print("New Hand")
+            new_hand = False
+            update_hand(robot)
+        if new_river:
+            print("New River")
+            new_river = False
+            update_river(robot)
         if new_turn:
             print("New Turn")
             new_turn = False
+            take_turn(robot, current_bet, hand, river)
+        time.sleep(0.5)
 
     print("Disconnecting Robot...")
     robot.close_connection()
     print("Robot Disconnected")
+
+def take_turn(robot, current_bet, hand, river):
+    pass
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
@@ -110,10 +120,16 @@ def die():
     shutdown_server()
     return "Goodnight"
 
-@app.route("/deal")
-def new_deal():
-    global new_deal
-    new_deal = True
+@app.route("/river")
+def new_river():
+    global new_river
+    new_river = True
+    return "Confirmed"
+
+@app.route("/hand")
+def new_hand():
+    global new_hand
+    new_hand = True
     return "Confirmed"
 
 @app.route("/turn")
@@ -142,12 +158,22 @@ def fold(robot):
     pass
 
 def show(robot):
+    # Move arm
+    # Grab cards
+    # Move arm
+    # Drop Cards
     pass
 
-def river(robot):
+def update_river(robot):
+    # Move arm
+    # AI get 3-5 cards
+    # Move arm
     pass
 
-def draw(robot):
+def update_hand(robot):
+    # Move arm
+    # AI get 2 cards
+    # Move arm
     pass
 
 def getFrame():
