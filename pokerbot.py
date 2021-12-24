@@ -10,6 +10,7 @@ import random
 import torch
 import torch.backends.cudnn as cudnn
 
+sys.path.insert(0, 'yolov5')
 from models.experimental import attempt_load
 from utils.general import check_img_size, non_max_suppression
 from utils.torch_utils import select_device, time_synchronized
@@ -68,7 +69,7 @@ def yoloThread():
 
     model = attempt_load("best.pt", map_location=device)
     stride = int(model.stride.max())
-    imgsz = check_img_size(imgsz, s=stride)
+    imgsz = 576
     if half:
         model.half()  # to FP16
 
@@ -81,11 +82,13 @@ def yoloThread():
     while not shut_r_down:
         if new_frame:
             image_lock.acquire()
-            frame = _frame
+            frame = _frame.copy()
             new_frame = False
             image_lock.release()
 
-            ###################
+            frame = frame[0:720, 280:280+720]
+            frame = cv2.resize(frame, (imgsz, imgsz))
+            frame = frame.transpose((2, 0, 1))
             img = torch.from_numpy(frame).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -94,9 +97,9 @@ def yoloThread():
 
             # Inference
             t1 = time_synchronized()
-            pred = model(img, augment=opt.augment)[0]
+            pred = model(img)[0]
 
-            pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
+            pred = non_max_suppression(pred, 0.4, 0.45)
             t2 = time_synchronized()
 
             s = ""
@@ -139,7 +142,7 @@ def cameraThread():
     print("Video Stream Closed")
 
 def armThread():
-    global shut_r_down, robot, current_bet, new_hand, new_river
+    global shut_r_down, robot, current_bet, new_turn, new_hand, new_river
 
     while not shut_r_down:
         if new_hand:
@@ -181,32 +184,32 @@ def die():
     return "Goodnight"
 
 @app.route("/river")
-def new_river():
+def river():
     global new_river
     new_river = True
     return "Confirmed"
 
 @app.route("/hand")
-def new_hand():
+def hand():
     global new_hand
     new_hand = True
     return "Confirmed"
 
 @app.route("/turn")
-def new_turn():
+def turn():
     global current_bet, new_turn
     current_bet = int(request.args.get("current_bet"), 0)
     new_turn = True
     return "Confirmed"
 
 @app.route("/lose")
-def new_turn():
+def lose():
     playAudio(audio, "lose")
     return "Confirmed"
 
 @app.route("/win")
-def new_turn():
-    playAudio(audio, "lose")
+def win():
+    playAudio(audio, "win")
     return "Confirmed"
 
 def bet(robot):
@@ -246,9 +249,12 @@ def getFrame():
     return rframe
 
 def main():
-    global shut_r_down, image_lock, new_frame, robot
+    global shut_r_down, image_lock, new_turn, new_hand, new_river, robot
 
-    new_frame = False
+    current_bet = 0
+    new_turn = False
+    new_hand = False
+    new_river = False
     shut_r_down = False
 
     audioFile = open("audio.yaml", 'r')
