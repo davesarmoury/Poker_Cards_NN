@@ -19,7 +19,7 @@ app = Flask(__name__)
 cors = CORS(app, resources={r"*": {"origins": "*"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-robot_ip = "192.168.2.114"
+robot_ip = "192.168.2.107"
 grip_speed = 500
 
 def playAudio(audio, type, dir="portal_turret_audio/audio/", odds=70):
@@ -82,12 +82,22 @@ def armThread():
     global shut_r_down, robot, current_bet, new_turn, new_deal
 
     while not shut_r_down:
-        #ROBOTTING
-        pass
+        if new_deal:
+            print("New Deal")
+            new_deal = False
+        if new_turn:
+            print("New Turn")
+            new_turn = False
 
     print("Disconnecting Robot...")
     robot.close_connection()
     print("Robot Disconnected")
+
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
 
 @app.route("/quit")
 def die():
@@ -97,7 +107,8 @@ def die():
     pygame.mixer.quit()
     time.sleep(1.0)
     print("Goodnight")
-    sys.exit(0)
+    shutdown_server()
+    return "Goodnight"
 
 @app.route("/deal")
 def new_deal():
