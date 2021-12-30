@@ -1,6 +1,3 @@
 [submodule "yolov5"]
 	path = yolov5
 	url = https://github.com/ultralytics/yolov5
-[submodule "portal_turret_audio"]
-	path = portal_turret_audio
-	url = git@github.com:davesarmoury/portal_turret_audio.git
